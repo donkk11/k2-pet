@@ -7,6 +7,8 @@ native window, no cloud dependency, no data leaves your machine.
 
 ![Gentleman KK — idle, working, checking, waiting for permission, problem, finished](media/gentleman-states.png)
 
+**[▶ Watch the pet running](https://github.com/donkk11/k2-pet/releases/download/v1.0.0/k2-nkama-pet-story_2026-09-19_23-03-46.mp4)** (44s)
+
 ## Install
 
 macOS, with **Node 18+** and **Python 3.9+** already installed:
