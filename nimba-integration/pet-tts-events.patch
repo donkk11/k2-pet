@@ -1,0 +1,88 @@
+--- nimba/history/nimba_daemon.py.backup_pre_pet_tts_events_20261010	2026-10-10 00:51:04
++++ nimba-integration/nimba_daemon.py	2026-10-10 00:55:18
+@@ -621,6 +621,20 @@
+     text = re.sub(r'\s+', ' ', text).strip()           # collapse whitespace
+ 
+     return text
++
++
++def pet_tts(event: str):
++    """Tell the K2 pet when Nimba starts/stops speaking ('started' | 'ended').
++    Fire-and-forget on its own thread: a missing pet must never delay or break audio."""
++    def _post():
++        try:
++            urllib.request.urlopen(urllib.request.Request(
++                'http://127.0.0.1:3043/ingest',
++                data=json.dumps({'method': f'nimba/tts.{event}'}).encode(),
++                headers={'Content-Type': 'application/json'}), timeout=0.5)
++        except Exception:
++            pass
++    threading.Thread(target=_post, daemon=True).start()
+ 
+ 
+ def stop_reading():
+@@ -636,6 +650,7 @@
+         except Exception: pass
+     _afplay_proc = None
+     overlay_update(-1, '')
++    pet_tts('ended')
+ 
+ 
+ def pause_reading():
+@@ -652,6 +667,7 @@
+         except Exception: pass
+     _afplay_proc = None
+     print('[Nimba Daemon] ⏸ Paused', flush=True)
++    pet_tts('ended')
+ 
+ 
+ def resume_reading():
+@@ -662,6 +678,7 @@
+     _is_paused = False
+     _pause_event.set()  # unblocks the waiting read loop
+     print('[Nimba Daemon] ▶ Resumed', flush=True)
++    pet_tts('started')
+ 
+ 
+ def seek_reading(index: int):
+@@ -843,6 +860,8 @@
+         return  # reading was cancelled before this sentence started
+ 
+     _speaking = True
++    if sentence_index < 0:
++        pet_tts('started')  # a spoken answer; read-aloud sentences report once per session instead
+     tmp = None
+     try:
+         wav_bytes = _fetch_tts_wav(text, voice, KOKORO_SPEED, tries=3)
+@@ -866,6 +885,8 @@
+         _afplay_proc = None
+     finally:
+         _speaking = False
++        if sentence_index < 0:
++            pet_tts('ended')
+         if tmp and os.path.exists(tmp):
+             try:
+                 os.unlink(tmp)
+@@ -1237,6 +1258,7 @@
+ 
+         with _reading_lock:
+             _is_reading = True
++        pet_tts('started')
+ 
+         print(f'[Nimba Daemon] 📖 Reading {len(sentences)} sentence(s): {selected[:60]}…')
+         notify('Nimba 📖', f'Reading {len(sentences)} sentence{"s" if len(sentences)>1 else ""}…')
+@@ -1421,12 +1443,14 @@
+ 
+         with _reading_lock:
+             _is_reading = False
++        pet_tts('ended')
+ 
+     except Exception as e:
+         print(f'[Nimba Daemon] read-aloud error: {e}')
+         traceback.print_exc()
+         with _reading_lock:
+             _is_reading = False
++        pet_tts('ended')
+     finally:
+         _recording = False
+ 
