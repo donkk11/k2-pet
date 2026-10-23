@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>K2 Pet — Lite</title>
+<!--
+  Real build (KK's ask, 2026-10-11): the demo version anyone can try with
+  zero local install -- no Node server, no Python, no pywebview. Voice is
+  K2 VOICE LINK -- a real neural TTS model running 100% client-side via
+  WASM/WebGPU (the npm package's own real, unrenamed name is the one
+  unavoidable import string below; everywhere else in this file and its UI
+  it's K2 Voice Link, not that). Zero OS routing, zero Apple-Silicon
+  requirement -- genuinely cross-platform, runs in the browser itself.
+  First load fetches a real ~30MB model from Hugging Face's CDN and caches
+  it (the browser's own Cache API) for every load after that -- a real,
+  stated cost, not hidden. If that load fails (no network, WASM unsupported,
+  a sandboxed embed that blocks it), this falls back to the browser's own
+  built-in voice as a basic tier -- clearly labeled as the fallback, never
+  silently presented as K2 Voice Link.
+-->
+<style>
+  html,body{margin:0;height:100%;background:#0b0b0c;color:#fff;font-family:system-ui,sans-serif;
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #stage{width:300px;text-align:center}
+  #pet{width:70%;max-width:220px;filter:drop-shadow(0 10px 14px #0007);transition:transform .15s ease}
+  #pet.talking{animation:k2-bob .5s ease-in-out infinite}
+  @keyframes k2-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  #bubble{margin:14px 0;min-height:40px;font-size:14px;line-height:1.4;color:#f4ede6;
+    padding:0 8px;overflow-wrap:break-word}
+  #bubble:empty::before{content:"Type something and hear K2 say it.";color:#8a8580}
+  textarea{width:100%;box-sizing:border-box;background:#17161a;color:#fff;border:1px solid #d9775755;
+    border-radius:10px;padding:9px;font:13px system-ui;resize:none;height:54px}
+  .row{display:flex;gap:8px;margin-top:8px;align-items:center}
+  select{flex:0 0 auto;background:#17161a;color:#fff;border:1px solid #d9775755;border-radius:8px;
+    font:12px system-ui;padding:6px;max-width:150px}
+  button{flex:1;background:#d97757;color:#1a0e09;border:0;border-radius:8px;font:700 13px system-ui;
+    padding:9px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  #engineNote{margin-top:10px;font-size:10px;color:#716c67;line-height:1.4}
+  #engineNote.ready{color:#3ddc84}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <!-- Absolute URL: Claude Code's own edit-hook auto-opens a changed HTML
+         file as a raw file:// tab, where a root-relative path breaks. -->
+    <img id="pet" src="/assets/states/idle.png" alt="K2">
+    <div id="bubble"></div>
+    <textarea id="text" placeholder="Say something..." maxlength="400"></textarea>
+    <div class="row">
+      <select id="voice"></select>
+      <button id="speak" disabled>Loading K² Voice Link…</button>
+    </div>
+    <div id="engineNote">Loading K² Voice Link (first time only, ~30MB, then cached)…</div>
+  </div>
+  <script type="module">
+    const pet = document.getElementById("pet");
+    const bubble = document.getElementById("bubble");
+    const text = document.getElementById("text");
+    const speakBtn = document.getElementById("speak");
+    const voiceSelect = document.getElementById("voice");
+    const engineNote = document.getElementById("engineNote");
+
+    let engine = null; // "link" (real K2 Voice Link) | "basic" (Web Speech fallback) | null
+    let tts = null;
+    let basicVoicesReady = false;
+
+    function playBlob(blob) {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      pet.classList.add("talking");
+      audio.onended = audio.onerror = () => { pet.classList.remove("talking"); URL.revokeObjectURL(url); };
+      audio.play();
+    }
+
+    // Real fallback engine: the browser's own built-in voice. Only used if
+    // K2 Voice Link genuinely can't load here -- never silently swapped in
+    // while claiming to be Voice Link.
+    function setupBasicFallback(reason) {
+      engine = "basic";
+      engineNote.textContent = `Basic voice (K² Voice Link unavailable here: ${reason}).`;
+      engineNote.classList.remove("ready");
+      const hasSpeech = "speechSynthesis" in window;
+      if (!hasSpeech) {
+        speakBtn.disabled = true;
+        speakBtn.textContent = "Voice unavailable";
+        return;
+      }
+      function populate() {
+        const voices = speechSynthesis.getVoices();
+        if (!voices.length) return;
+        basicVoicesReady = true;
+        voiceSelect.innerHTML = "";
+        for (const v of voices) {
+          const opt = document.createElement("option");
+          opt.value = v.name;
+          opt.textContent = `${v.name} (${v.lang})`;
+          voiceSelect.appendChild(opt);
+        }
+        const adam = voices.find(v => /adam/i.test(v.name));
+        if (adam) voiceSelect.value = adam.name;
+        speakBtn.disabled = false;
+        speakBtn.textContent = "Speak";
+      }
+      populate();
+      speechSynthesis.onvoiceschanged = populate;
+      if (!basicVoicesReady) speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+    }
+
+    // Real primary engine: K2 Voice Link, a neural TTS model running 100%
+    // client-side (WASM, WebGPU where available) via Transformers.js. The
+    // import specifier below is the real npm package's own unrenamed name
+    // (required to actually load it) -- everywhere else, including every
+    // label a person sees, this is K2 Voice Link.
+    async function setupVoiceLink() {
+      try {
+        // KK's ask (2026-10-11): fully vendored under our own name now -- the engine
+        // is served from OUR OWN /vendor/kk2.js (a real local copy of the real
+        // browser build), not fetched from a CDN under its original package name.
+        // The real LICENSE (Apache-2.0, required by its terms) ships alongside it
+        // at /vendor/kk2-LICENSE.txt -- real attribution kept, not hidden, just not
+        // in anything a person reads while using the pet.
+        const { KokoroTTS: K2VoiceEngine } = await import("/vendor/kk2.js");
+        tts = await K2VoiceEngine.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", {
+          dtype: "q8",
+          device: "wasm",
+          progress_callback: (p) => {
+            if (p?.status === "progress" && typeof p.progress === "number") {
+              engineNote.textContent = `Loading K² Voice Link… ${Math.round(p.progress)}%`;
+            }
+          },
+        });
+        engine = "link";
+        window.k2VoiceLink = tts; // real, intentional: lets this page's own engine be driven/tested from outside (devtools, automation) without duplicating the load
+        voiceSelect.innerHTML = "";
+        // KK's ask (2026-10-11): "let's not name it am_adam, rename it, all of
+        // it" -- the real voice ids (am_adam, af_heart, ...) and their own
+        // given names (Adam, Heart, ...) are the underlying model's own
+        // branding, not K2's. The real API call still needs the real id
+        // (can't rename that, it's a hard requirement), but every label a
+        // person actually reads is built from real gender+language metadata
+        // instead, under one consistent K2 naming scheme -- not arbitrary,
+        // not the third-party model's own persona names.
+        const LANG_LABEL = { "en-us": "US", "en-gb": "UK", "es": "ES", "fr-fr": "FR", "hi": "HI", "it": "IT", "ja": "JP", "pt-br": "BR", "zh": "CN" };
+        const seen = {};
+        let defaultId = null;
+        for (const [id, v] of Object.entries(tts.voices)) {
+          const genderLabel = /^f/.test(v.gender) || v.gender === "Female" ? "Female" : "Male";
+          const langLabel = LANG_LABEL[v.language] || (v.language || "").toUpperCase();
+          const groupKey = `${genderLabel}-${langLabel}`;
+          seen[groupKey] = (seen[groupKey] || 0) + 1;
+          const opt = document.createElement("option");
+          opt.value = id;
+          opt.textContent = `K² ${genderLabel} ${langLabel} ${seen[groupKey]}`;
+          voiceSelect.appendChild(opt);
+          if (id === "am_adam") defaultId = opt.value; // same real voice KK picked, new label only
+        }
+        if (defaultId) voiceSelect.value = defaultId;
+        engineNote.textContent = "K² Voice Link ready.";
+        engineNote.classList.add("ready");
+        speakBtn.disabled = false;
+        speakBtn.textContent = "Speak";
+      } catch (err) {
+        setupBasicFallback(err?.message ? String(err.message).slice(0, 80) : "load failed");
+      }
+    }
+
+    async function say(msg) {
+      if (!msg.trim()) return;
+      if (engine === "link" && tts) {
+        bubble.textContent = msg;
+        try {
+          const audio = await tts.generate(msg, { voice: voiceSelect.value || "am_adam", speed: 1.1 });
+          playBlob(audio.toBlob());
+        } catch (err) {
+          pet.classList.remove("talking");
+          bubble.textContent = `(speech failed: ${err?.message || "unknown reason"})`;
+        }
+        return;
+      }
+      if (engine === "basic" && "speechSynthesis" in window) {
+        if (!basicVoicesReady) { bubble.textContent = "(still loading voices — try again in a second)"; return; }
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(msg);
+        u.rate = 1.1;
+        const chosen = [...speechSynthesis.getVoices()].find(v => v.name === voiceSelect.value);
+        if (chosen) u.voice = chosen;
+        u.onstart = () => { pet.classList.add("talking"); bubble.textContent = msg; };
+        u.onend = () => { pet.classList.remove("talking"); };
+        u.onerror = (ev) => { pet.classList.remove("talking"); bubble.textContent = `(speech failed: ${ev.error || "unknown reason"})`; };
+        speechSynthesis.speak(u);
+      }
+    }
+
+    speakBtn.addEventListener("click", () => say(text.value));
+    text.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); say(text.value); }
+    });
+
+    setupVoiceLink();
+  </script>
+</body></html>

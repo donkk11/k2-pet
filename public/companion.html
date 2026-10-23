@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>K2</title>
+<link rel="stylesheet" href="/states.css">
+<style>
+  html,body{margin:0;padding:0;background:transparent;overflow:hidden;height:100%}
+  .pet-card[data-motion="running-right"] #pet,.pet-card[data-motion="running-left"] #pet,
+  .pet-card.hover-wave #pet{display:none}
+  /* Real bug KK caught live: #pet (the static img) is capped at max-height:66%, but
+     #pet-sprite (every strip -- wave, working, checking, running, ...) was forced to a
+     FIXED height:78%, ~18% taller. Switching from an idle static pose into any animation
+     made the character visibly jump in size, not because any character's art changed but
+     because the two elements were bounded differently. max-height+max-width (matching
+     #pet's own numbers exactly) lets aspect-ratio size each strip the same way
+     object-fit:contain sizes the img, so every pose reads as the same real height. */
+  #pet-sprite{display:none;height:88%;max-width:78%;background-repeat:no-repeat;background-position:0 50%;
+    filter:drop-shadow(0 8px 10px #0004);will-change:background-position;transition:height .2s ease}
+  .pet-card[data-motion="running-right"] #pet-sprite,.pet-card[data-motion="running-left"] #pet-sprite,
+  .pet-card.hover-wave #pet-sprite{display:block}
+  /* Gentleman KK sprite set -- every strip tightly cropped from the verified atlas, so
+     each rule carries that strip's REAL frame count and REAL aspect ratio. Getting either
+     wrong is what caused the old cropped/bleeding-frame bug. */
+  .pet-card[data-motion="running-right"] #pet-sprite{
+    aspect-ratio:113/198;background-image:url('/assets/animations/running-right.png');background-size:800% 100%;
+    animation:k2-strip-eight .8s steps(7,end) infinite}
+  .pet-card[data-motion="running-left"] #pet-sprite{
+    aspect-ratio:127/198;background-image:url('/assets/animations/running-left.png');background-size:800% 100%;
+    animation:k2-strip-eight .8s steps(7,end) infinite}
+  .pet-card.hover-wave #pet-sprite{aspect-ratio:130/198;background-image:url('/assets/animations/waving.png');
+    background-size:400% 100%;animation:k2-strip-four 1.1s steps(3,end) infinite}
+  /* These override states.css, which was written for the old hoodie set and has the
+     wrong frame count for listening (6, not 8) and a 1/2 aspect that squashes the suit. */
+  .pet-card[data-motion="working"] #pet-sprite{aspect-ratio:127/198;
+    background-image:url('/assets/animations/working.png');background-size:600% 100%;
+    animation:k2-strip-six 4.8s steps(5,end) infinite}
+  .pet-card[data-motion="checking"] #pet-sprite{aspect-ratio:121/198;
+    background-image:url('/assets/animations/checking.png');background-size:600% 100%;
+    animation:k2-strip-six 4.5s steps(5,end) infinite}
+  .pet-card[data-motion="listening"] #pet-sprite{aspect-ratio:111/202;
+    background-image:url('/assets/animations/listening.png');background-size:600% 100%;
+    animation:k2-strip-six 4.4s steps(5,end) infinite}
+  .pet-card[data-motion="speaking"] #pet-sprite{aspect-ratio:91/202;
+    background-image:url('/assets/animations/speaking.png');background-size:800% 100%;
+    animation:k2-strip-eight 4s steps(7,end) infinite}
+  /* Real jump celebration for a finished task -- KK's own observation: nothing moved
+     when a task completed. Real 5-frame strip (verified 173x198/frame), already
+     extracted from the atlas months ago but never wired to anything. Dances for real
+     time now (12s safety net, see state-mapper.mjs's finishedMs) -- KK can also just
+     click him to dismiss it early into a waiting pose (see companion.js). */
+  .pet-card[data-motion="finished"] #pet-sprite{aspect-ratio:173/198;
+    background-image:url('/assets/animations/jumping.png');background-size:500% 100%;
+    animation:k2-strip-eight .6s steps(4,end) infinite}
+  /* Real distinct reaction for a permission request, per KK's own ask. Real 6-frame
+     thumbs-up/acknowledging strip that existed in the atlas (row 6) but only a single
+     static frame had ever been pulled from it before now. */
+  .pet-card[data-motion="permission"] #pet-sprite{aspect-ratio:98/198;
+    background-image:url('/assets/animations/permission-wait.png');background-size:600% 100%;
+    animation:k2-strip-eight 1.4s steps(5,end) infinite}
+  @keyframes k2-strip-eight{from{background-position:0 50%}to{background-position:100% 50%}}
+  @keyframes k2-strip-six{from{background-position:0 50%}to{background-position:100% 50%}}
+  @keyframes k2-strip-four{from{background-position:0 50%}to{background-position:100% 50%}}
+
+  #stage{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;padding-bottom:10px;box-sizing:border-box}
+  /* Real fix: the character was vertically centered in the whole flex area, leaving a
+     visible gap above the floor now that compose moved to a bubble up top. Bottom-align
+     so his feet actually meet the floor bar below. */
+  #pet-card{position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:flex-end;justify-content:center;cursor:pointer}
+  /* Real bug KK caught live: max-height only ever CAPS a size, it never grows one -- an
+     <img> (this element) defaults to its own natural pixel size and just shrinks if that
+     would exceed the cap, while #pet-sprite below is a plain <div>, which has no natural
+     size of its own and instead fills the available WIDTH by default, then derives height
+     from aspect-ratio -- two genuinely different sizing algorithms, even under identical
+     max-height/max-width numbers. An explicit height (not max-height) forces both elements
+     onto the exact same real pixel height regardless of which one is showing, which is what
+     actually makes "the character stays the same size, only the pose changes" true. */
+  #pet{height:88%;max-width:78%;object-fit:contain;filter:drop-shadow(0 8px 10px #0004);transition:height .2s ease}
+  /* Real bug KK caught: the old default (66%) reserved headroom for a speech/status
+     bubble ALL the time, even fully idle with nothing showing -- a permanently empty gap
+     above his head for no reason. The bubble only needs that room while it's actually
+     open, so the character now defaults big (88%) and shrinks only when something is
+     really about to appear above him, via has-bubble below. */
+  body.has-bubble #pet,body.has-bubble #pet-sprite{height:66%}
+  /* Real fix: a real (multi-line) alert message was tall enough to cover K2's whole head.
+     Shrinking him further (bottom-anchored, so this opens clearance at the TOP, not the
+     bottom) while an alert is showing keeps the bubble from ever overlapping the character.
+     Comes after has-bubble so it wins when both apply (equal specificity, later wins). */
+  body.has-alert #pet,body.has-alert #pet-sprite{height:46%}
+  /* Per-instance accent. Nimba keeps the original K2-brand gold; Claude Code gets
+     Claude's own warm terracotta (~#D97757, the real claude.ai accent) instead of a
+     generic violet, so the pet actually reads as "Claude Code" rather than
+     borrowing Codex's palette. */
+  body.is-nimba{--accent:#c68a3a;--accent-soft:#c68a3a33}
+  body.is-code{--accent:#d97757;--accent-soft:#d9775733}
+  /* Realistic glass system (KK's ask, 2026-10-10): every floating surface --
+     the deck, every picker/bubble, the hide orb -- gets true backdrop-filter
+     glass (blurs whatever's actually behind the transparent native window,
+     not a flat tint pretending to be glass), a soft inner top highlight (the
+     "edge catches light" cue real glass has), and a thin bright-on-dark rim.
+     One set of variables so every surface reads as the same material. */
+  :root{
+    --glass-fill:linear-gradient(165deg, rgba(255,255,255,.10), rgba(255,255,255,.02) 40%, rgba(0,0,0,.08));
+    --glass-bg:rgba(22,20,19,.46);
+    --glass-bg-strong:rgba(18,17,16,.62);
+    --glass-border:rgba(255,255,255,.16);
+    --glass-hi:rgba(255,255,255,.38);
+    /* Real bug found from a live screenshot: panels over the character read the
+       bare sprite straight through the blur (it's a busy, detailed image, not a
+       plain desktop), making overlapping row text unreadable. Frosted glass (the
+       real-world material this is modeling) is much more opaque than clear glass --
+       this is the heavier fill used by every POPOVER specifically, not the deck. */
+    --glass-bg-frosted:rgba(15,14,13,.86);
+  }
+  .glass{
+    background:var(--glass-fill), var(--glass-bg-strong);
+    -webkit-backdrop-filter:blur(22px) saturate(170%);
+    backdrop-filter:blur(22px) saturate(170%);
+    border:1px solid var(--glass-border);
+    box-shadow:inset 0 1px 0 var(--glass-hi), inset 0 0 22px rgba(255,255,255,.04),
+      0 14px 34px -6px #000a, 0 0 0 1px #0006;
+  }
+  /* Real fix for "it should just be the animal standing, like Codex" -- the bar is
+     chrome, not the character, so it stays hidden until the stage is hovered. A small
+     dash (matching Codex's own idle affordance) sits in the bar's place so there's
+     still a hint that controls exist. KK asked to remove the "CODE/PET" text badge
+     that used to live here -- gone; the accent-color class it also set stays, still
+     used elsewhere to tell a Nimba vs. Code instance apart by hue. */
+  /* The floor -- a landing platform K2 stands on, not a Codex-style floating pill.
+     Afrofuturist cue: obsidian slab, a glowing accent seam across the top edge (like
+     a hoverboard's power line), and a faint repeating chevron texture -- geometric,
+     not literal Kente/Adinkra, so it reads as tech rather than costume. The slab
+     itself lives on ::before so it can fully recede when idle, leaving only the
+     glow-line dash -- true "hides when idle", not just its buttons. */
+  /* Fourth round of the same bug, same root cause -- each new bar button needs this
+     re-measured, not assumed stable. Real content span at the window's actual resize
+     floor, measured live via getBoundingClientRect(), body.is-code:
+       5 buttons (original)                  -> ~91px  -> min-width 100px (stale)
+       6 buttons (+ speaker, 2026-10-08)     -> 118px  -> min-width 120px (stale)
+       7 buttons (+ voice-select, 2026-10-09) -> 143px -> min-width 150px (stale)
+       8 buttons (+ tasks, 2026-10-09)        -> 167px -> this min-width
+     Measured and fixed BEFORE shipping this time, in the same commit that added
+     #btn-tasks, instead of waiting for KK to hit it a fourth time -- raised the
+     window's own floor to match in k2-pet-floating-window.py's resize() (same
+     commit) so the two numbers stay in lockstep.
+     Nimba's bar (body.is-nimba, +voice-chat button = 9 total) is wider still and
+     NOT covered by this number -- not touched, every report so far has been about
+     the Claude Code pet; re-measure it for real before assuming it's fine too. */
+  /* Real correction (KK, 2026-10-10): "the always-visible deck... that's not
+     what I want" -- making it permanent was my own call in the first redesign,
+     not his ask, and he's reverted it directly: glass should change how the
+     deck LOOKS once revealed (true frosted material), not whether it stays
+     visible. Same hover-gated reveal as classic, same #dash idle hint -- the
+     deck's visibility behavior is now identical across both skins, only its
+     surface material differs. */
+  #chrome{position:relative;flex:0 0 auto;width:86%;min-width:170px;height:48px;margin:0 auto;-webkit-app-region:no-drag;border-radius:18px}
+  #chrome::before{content:"";position:absolute;inset:0;border-radius:18px;
+    background:var(--glass-fill), var(--glass-bg-strong);
+    -webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%);
+    /* Real fix (KK's ask): "it doesn't look like glass, it's just a gray faded
+       background" -- the old shadow here (0 12px 26px -6px, ~67% black alpha)
+       was a big, dark, low drop shadow sitting under the bar, which is exactly
+       what read as a muddy smudge instead of a material. Real glass (macOS's
+       own Control Center/sidebar material) leans on a crisp 1px edge and a
+       soft inner highlight, not a heavy outer shadow -- lighter and tighter
+       here, closer to the real thing it's modeling. */
+    box-shadow:inset 0 1px 0 var(--glass-hi), inset 0 0 14px rgba(255,255,255,.05),
+      0 6px 14px -4px #0008, 0 0 0 1px #0004;
+    border:1px solid var(--glass-border);
+    opacity:0;transition:opacity .25s ease}
+  #stage:hover #chrome::before{opacity:1}
+  #chrome::after{content:"";position:absolute;left:14%;right:14%;bottom:-5px;height:5px;border-radius:50%;
+    background:radial-gradient(closest-side, var(--accent-soft), transparent 70%);filter:blur(1px);
+    opacity:0;transition:opacity .25s ease}
+  #stage:hover #chrome::after{opacity:1}
+  /* Real restore: this rule was dropped entirely when the deck briefly went
+     always-visible -- #dash had nothing left to style it since, silently
+     invisible rather than broken-looking, but not doing its real job (the
+     idle hint that controls exist, same role in both skins now). */
+  #dash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent),transparent);
+    opacity:1;transition:opacity .2s ease;pointer-events:none}
+  #stage:hover #dash{opacity:0}
+  #bar{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;gap:0;
+    -webkit-app-region:no-drag;opacity:0;pointer-events:none;transition:opacity .2s ease}
+  #stage:hover #bar{opacity:1;pointer-events:auto}
+  body.composing #bar,body.composing #chrome::before,body.composing #chrome::after{opacity:0 !important;pointer-events:none !important}
+  body.composing #dash{opacity:1}
+  #bar button{all:unset;cursor:pointer;color:#e8e4e0;opacity:.8;width:30px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;font:600 15px system-ui;transition:background .15s ease,color .15s ease,opacity .15s ease,transform .15s ease}
+  #bar button:hover{background:rgba(255,255,255,.08);color:var(--accent);opacity:1;transform:translateY(-1px)}
+  #bar button[aria-pressed="true"]{color:#fff;background:var(--accent);opacity:1}
+  #bar .divider{width:1px;height:16px;background:rgba(255,255,255,.12);margin:0 1px}
+  /* Default: dim and inert-looking (opacity already .75 from the base rule, no glow)
+     until a real result is actually cached server-side -- .has-result is set/cleared
+     live off the real "hasResult" field in the SSE stream, never a guess. */
+  #btn-speak{color:var(--accent);opacity:.35}
+  #btn-speak.has-result{opacity:1;color:#fff;animation:k2-speak-glow 1.6s ease-in-out infinite}
+  @keyframes k2-speak-glow{
+    0%,100%{background:transparent;box-shadow:0 0 0 0 transparent}
+    50%{background:var(--accent);box-shadow:0 0 10px 2px var(--accent)}
+  }
+  /* Claude Code has no voice input yet (real voice-to-text wiring is a pending item) --
+     hide the button rather than ship a dead control. Nimba keeps it, since its voice
+     path is real. */
+  body.is-code #btn-voice,body.is-code #voice-divider{display:none}
+  /* Everything hides except this one persistent, always-visible dot -- that's the only
+     way back once hidden, per KK's real complaint that the old version hid its own toggle. */
+  body.hidden #pet-card,body.hidden #chrome{display:none}
+  /* Real redesign (KK's ask, 2026-10-10): "the hide icon, glass, glowing when
+     it's on hide" -- #peek IS that icon: the one control left on screen once
+     everything else is hidden, so it's the thing that needs to read as "lit"
+     rather than just another flat button. True glass body (blurs the real
+     desktop behind it, same --glass-* system as every panel) with a real
+     lantern glyph and a warm inner glow that breathes -- not a color swap,
+     an actual light source look, echoing the K2 lantern mark. */
+  #peek{all:unset;position:fixed;bottom:10px;right:10px;cursor:pointer;width:44px;height:44px;
+    border-radius:999px;display:none;color:var(--accent);
+    align-items:center;justify-content:center;-webkit-app-region:no-drag;
+    background:var(--glass-fill), var(--glass-bg-strong);
+    -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
+    border:1px solid var(--glass-border);
+    box-shadow:inset 0 1px 0 var(--glass-hi), 0 4px 16px #0009, 0 0 0 1px #0006,
+      0 0 16px -2px var(--accent-soft);
+    animation:k2-peek-glow 2.4s ease-in-out infinite}
+  body.hidden #peek{display:flex}
+  /* The real mark keeps its own real brand color (a fixed orange) rather than
+     being force-tinted to --accent -- Nimba's gold vs. Code's terracotta still
+     shows in the glow around it (box-shadow above), just not on the mark itself. */
+  #peek img{filter:drop-shadow(0 0 4px var(--accent))}
+  #peek-classic-icon{display:none;font:700 12px/1 system-ui;color:#fff}
+  @keyframes k2-peek-glow{
+    0%,100%{box-shadow:inset 0 1px 0 var(--glass-hi), 0 4px 16px #0009, 0 0 0 1px #0006, 0 0 14px -2px var(--accent-soft)}
+    50%{box-shadow:inset 0 1px 0 var(--glass-hi), 0 4px 18px #0009, 0 0 0 1px #0006, 0 0 22px 2px var(--accent)}
+  }
+  /* Real redesign (KK's ask, 2026-10-10): every popover is now a true glass
+     card ("glass menu"), not a flat-color speech bubble with a drawn tail --
+     dropped the little triangle tails too, cleaner floating-card language,
+     matching the reference he sent. Panel geometry (top:22px, same left/
+     right insets, same .open class each handler already toggles) is
+     UNCHANGED, so none of companion.js's open/close logic needed to change
+     for this -- only how each surface actually looks. */
+  #compose,#alert-bubble,#status-card,#char-picker,#voice-picker,#task-picker{
+    display:none;position:absolute;top:22px;left:8px;right:8px;border-radius:16px;
+    padding:10px 12px;color:#fff;font:12px/1.4 system-ui;overflow:hidden;box-sizing:border-box;
+    background:var(--glass-fill), var(--glass-bg-frosted);
+    -webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);
+    border:1px solid var(--glass-border);
+    box-shadow:inset 0 1px 0 var(--glass-hi), inset 0 0 20px rgba(255,255,255,.03),
+      0 16px 36px -8px #000c, 0 0 0 1px #0006;
+  }
+  /* Same real fix, narrowly scoped: dim the character only behind the three LIST
+     panels (char/voice/task), the ones with real row content that actually sits
+     where his face is. has-bubble (used for click-through hot-zone sizing) fires
+     for status-card too, which is a thin pill that never overlaps him -- reusing
+     it here would wrongly dim him on nearly every ordinary state change. :has()
+     targets just the panels that need it. */
+  #pet,#pet-sprite{transition:opacity .2s ease}
+  #stage:has(#char-picker.open) #pet,#stage:has(#char-picker.open) #pet-sprite,
+  #stage:has(#voice-picker.open) #pet,#stage:has(#voice-picker.open) #pet-sprite,
+  #stage:has(#task-picker.open) #pet,#stage:has(#task-picker.open) #pet-sprite{opacity:.22}
+  #compose.open,#alert-bubble.open,#status-card.open,#char-picker.open,#voice-picker.open,#task-picker.open{display:block}
+  #compose textarea{all:unset;display:block;width:100%;box-sizing:border-box;color:#fff;font:13px system-ui;resize:none;max-height:80px}
+  #compose textarea::placeholder{color:#ccc9c6}
+  /* Real macOS Notification hook fires land here too, not just in the system notification
+     center -- read-only and self-dismissing, with a warmer glow so it reads as "needs
+     you" rather than an ordinary status change. Same glass body as every other panel. */
+  #alert-bubble{cursor:pointer;animation:k2-alert-pulse 1.8s ease-in-out infinite;overflow-wrap:break-word;border-color:var(--accent-soft)}
+  #alert-bubble b{color:var(--accent);display:block;font-size:10px;letter-spacing:.08em;margin-bottom:3px;overflow-wrap:break-word}
+  @keyframes k2-alert-pulse{
+    0%,100%{box-shadow:inset 0 1px 0 var(--glass-hi), 0 16px 36px -8px #000c, 0 0 0 1px var(--accent-soft)}
+    50%{box-shadow:inset 0 1px 0 var(--glass-hi), 0 16px 38px -8px #000c, 0 0 0 2px var(--accent)}
+  }
+  /* The real live-activity card: title = the actual semantic state (Working, Editing
+     files, ...), detail = the real caption from the hook payload when one exists
+     (never a placeholder). pointer-events:auto + cursor:pointer: dismissible mid-state
+     without losing the real state changes underneath (click reaches it, not what's behind). */
+  #status-card{padding:9px 22px 9px 11px;pointer-events:auto;cursor:pointer}
+  /* KK's ask (2026-10-09): make it read as alive while something's actually running --
+     a subtle breathing glow. Off for "finished"/"problem" (over states -- a done task
+     still breathing like it's running would be dishonest, not cool). */
+  #status-card.live{animation:k2-status-breathe 2.2s ease-in-out infinite}
+  @keyframes k2-status-breathe{
+    0%,100%{border-color:var(--glass-border)}
+    50%{border-color:var(--accent);box-shadow:inset 0 1px 0 var(--glass-hi), 0 16px 36px -8px #000c, 0 0 0 1px var(--accent)}
+  }
+  #status-card::before{content:"\2715";position:absolute;top:7px;right:8px;
+    font-size:9px;color:#bdb9b5;pointer-events:none}
+  /* Real bug found from a live screenshot: a narrow window left "COMMAND" not fitting
+     its wrapped line, spilling past the card's own edge with no ellipsis. break-word
+     forces it to wrap inside the card instead of escaping it. */
+  #status-card b{color:var(--accent);display:block;font-size:10px;letter-spacing:.07em;
+    margin-bottom:2px;overflow-wrap:break-word}
+  #status-card span{display:block;color:#d8d4d1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #char-picker b,#voice-picker b,#task-picker b{color:var(--accent);display:block;font-size:10px;letter-spacing:.07em;margin-bottom:6px}
+  /* Real bug found live: adding the skin section made #char-picker's total
+     content taller than the window -- the panel has no height cap of its own, so
+     the new "MENU SKIN" row was silently clipped by the viewport edge with no way
+     to scroll to it (body itself is overflow:hidden, and #char-list's own inner
+     scroll only covers the character rows above it, not what comes after). The
+     panel itself now scrolls as a whole, bounded to fit even the 180px resize floor. */
+  #char-picker{max-height:min(340px, calc(100vh - 70px));overflow-y:auto}
+  /* Real bug KK caught: with 5 characters now (Gentleman KK, K2 Nkama, Einstein,
+     Basketball Kid, Bruce Lee), the list's real content height (166px) exceeded this
+     140px cap -- room for real growth instead of the exact number that was just barely
+     failing today. */
+  #char-list,#voice-list,#task-list{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto}
+  .char-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;cursor:pointer;-webkit-app-region:no-drag}
+  .char-row:hover{background:rgba(255,255,255,.08)}
+  .char-row img{width:22px;height:22px;object-fit:contain;border-radius:6px;background:#000;flex:0 0 auto}
+  .char-row span:not(.check){flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .char-row .check{color:var(--accent);opacity:0;font-weight:700;flex:0 0 auto}
+  .char-row.selected{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+  .char-row.selected .check{opacity:1;color:var(--accent)}
+  .char-row.disabled{cursor:default;opacity:.45}
+  .char-row.disabled:hover{background:none}
+  .char-row.disabled span:not(.check){font-style:italic}
+  /* Real redesign (KK's ask, 2026-10-10): tasks get their OWN row class, not a reuse
+     of .char-row -- that reuse is exactly what caused the real bug he caught live: a
+     shared ".char-row span:not(.check){flex:1}" rule (meant for a label span) was also
+     matching the dot span (also a bare <span>, no .check class), so flex:1 overrode the
+     dot's own explicit 7px size and it rendered as a giant oval, not a small indicator.
+     .task-row's dot gets its own dedicated selector that nothing else can collide with. */
+  /* Real redesign toward KK's "Liquid Glass Kit" reference (2026-10-14):
+     vivid gradient pills instead of flat dark rows -- each row's own color
+     fill is now real, solid-enough content, so there's nothing for the
+     native window's real backdrop-filter to show through underneath it
+     (this is also the real fix for "the desktop bleeds through the task
+     list" he flagged in the same message -- a genuinely translucent dark
+     row had the real content behind the window showing through it; an
+     opaque-ish colored gradient doesn't). Color keys off the SAME real
+     per-state meaning the dot always had (amber=working, green=finished,
+     red=problem, gray=idle), just expressed as a real gradient fill now. */
+  .task-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;cursor:pointer;
+    -webkit-app-region:no-drag;background:linear-gradient(135deg,#4a4a52,#2e2e34);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 6px #0004;transition:transform .12s ease}
+  .task-row:hover{transform:translateY(-1px)}
+  .task-row.selected{box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 2px #fff,0 2px 8px #0006}
+  .task-row.disabled{cursor:default;opacity:.5}
+  .task-row.disabled:hover{transform:none}
+  .task-row .task-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:normal;
+    color:#fff;font-weight:600;text-shadow:0 1px 2px #0005}
+  .task-row .check{color:#fff;opacity:0;font-weight:700;flex:0 0 auto}
+  .task-row.selected .check{opacity:1}
+  .task-row[data-state="working"]{background:linear-gradient(135deg,#ffb84d,#f5791f)}
+  .task-row[data-state="finished"]{background:linear-gradient(135deg,#6ee7a8,#1fa968)}
+  .task-row[data-state="problem"]{background:linear-gradient(135deg,#ff8a8f,#d8363f)}
+  .task-row[data-state="interrupted"],.task-row[data-state="idle"]{background:linear-gradient(135deg,#9a98a0,#5c5a62)}
+  .task-dot{width:7px;height:7px;min-width:7px;min-height:7px;border-radius:50%;flex:0 0 7px;margin-right:2px;
+    background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+  .task-row[data-state="working"] .task-dot{animation:k2-dot-pulse 1.6s ease-in-out infinite}
+  @keyframes k2-dot-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  /* Glows only when there's actually something worth switching to -- a second task
+     with real content, not just because the button exists. Same glow language as
+     the speaker button's has-result, not a new one. */
+  #btn-tasks.has-other{color:#fff;animation:k2-speak-glow 2s ease-in-out infinite}
+
+  /* ============================================================================
+     CLASSIC SKIN (KK's ask, 2026-10-10): "let not do away [with] the old one, we
+     can have them like skins". Glass (above) is the default; this block restores
+     the ORIGINAL pre-redesign look byte-for-byte (pulled from git HEAD, not
+     reconstructed from memory) under body.skin-classic, selected live via the new
+     skin picker in companion.js -- no reload needed, pure CSS swap. Interaction
+     fixes (select-then-play, the real task-dot sizing bug, label disambiguation)
+     are NOT part of either skin -- those are correctness, not look, so both skins
+     share them unconditionally; only decorative surfaces are reskinned below. */
+  body.skin-classic #chrome{width:55%;min-width:170px;height:30px;border-radius:0}
+  body.skin-classic #chrome::before{border-radius:10px 10px 16px 16px;
+    background:
+      repeating-linear-gradient(135deg, #ffffff08 0 2px, transparent 2px 14px),
+      linear-gradient(180deg,#1c1c20,#0a0a0c);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    box-shadow:inset 0 1px 0 var(--accent), 0 12px 22px -4px #000a, 0 0 18px -6px var(--accent-soft);
+    opacity:0;transition:opacity .25s ease;border:none}
+  body.skin-classic #stage:hover #chrome::before{opacity:1}
+  body.skin-classic #chrome::after{opacity:0;transition:opacity .25s ease}
+  body.skin-classic #stage:hover #chrome::after{opacity:1}
+  body.skin-classic #dash{display:block;opacity:1}
+  body.skin-classic #stage:hover #dash{opacity:0}
+  body.skin-classic #bar{opacity:0;pointer-events:none}
+  body.skin-classic #stage:hover #bar{opacity:1;pointer-events:auto}
+  body.skin-classic #bar button{color:var(--accent);opacity:.75;width:32px;height:26px;border-radius:6px;transition:background .15s ease,color .15s ease,opacity .15s ease}
+  body.skin-classic #bar button:hover{background:var(--accent-soft);color:#fff;opacity:1;transform:none}
+  body.skin-classic #bar .divider{height:14px;background:var(--accent-soft)}
+  /* The original solid lit-dot peek, restored exactly -- vs. glass's lantern orb. */
+  body.skin-classic #peek{width:40px;height:40px;background:var(--accent);color:#fff;
+    -webkit-backdrop-filter:none;backdrop-filter:none;border:none;
+    box-shadow:0 0 0 2px #ffffff40,0 4px 14px #0009;animation:k2-peek-pulse 2s ease-in-out infinite}
+  body.skin-classic #peek-glass-icon{display:none}
+  body.skin-classic #peek-classic-icon{display:block}
+  @keyframes k2-peek-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  /* Flat panels with the original speech-bubble tail, no frost. */
+  body.skin-classic #compose,body.skin-classic #status-card,body.skin-classic #char-picker,
+  body.skin-classic #voice-picker,body.skin-classic #task-picker{
+    background:#141416;-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid var(--accent-soft);
+    box-shadow:0 8px 20px #0006;border-radius:14px}
+  body.skin-classic #alert-bubble{background:#1c1410;-webkit-backdrop-filter:none;backdrop-filter:none;
+    border:none;box-shadow:0 8px 24px #0008,0 0 0 1px var(--accent);border-radius:14px}
+  body.skin-classic #compose::after,body.skin-classic #status-card::after,body.skin-classic #char-picker::after,
+  body.skin-classic #voice-picker::after,body.skin-classic #task-picker::after{
+    content:"";position:absolute;left:22px;bottom:-7px;width:12px;height:12px;
+    background:#141416;border-right:1px solid var(--accent-soft);border-bottom:1px solid var(--accent-soft);
+    transform:rotate(45deg);border-radius:0 0 3px 0}
+  body.skin-classic #alert-bubble::after{content:"";position:absolute;left:22px;bottom:-7px;width:14px;height:14px;
+    background:#1c1410;border-right:1px solid var(--accent);border-bottom:1px solid var(--accent);
+    transform:rotate(45deg);border-radius:0 0 3px 0}
+  body.skin-classic #status-card.live{animation:k2-status-breathe-classic 2.2s ease-in-out infinite}
+  @keyframes k2-status-breathe-classic{
+    0%,100%{border-color:var(--accent-soft);box-shadow:0 8px 20px #0006}
+    50%{border-color:var(--accent);box-shadow:0 8px 20px #0006,0 0 10px -2px var(--accent)}
+  }
+  body.skin-classic .char-row:hover,body.skin-classic .task-row:hover{background:var(--accent-soft)}
+  /* Dimming the character behind an open picker exists only to fix frosted-glass
+     legibility -- classic's panels are already fully opaque, so it would just be a
+     pointless fade with nothing to solve. Scoped to glass only (was unconditional). */
+  body.skin-classic #stage:has(#char-picker.open) #pet,body.skin-classic #stage:has(#char-picker.open) #pet-sprite,
+  body.skin-classic #stage:has(#voice-picker.open) #pet,body.skin-classic #stage:has(#voice-picker.open) #pet-sprite,
+  body.skin-classic #stage:has(#task-picker.open) #pet,body.skin-classic #stage:has(#task-picker.open) #pet-sprite{opacity:1}
+  .skin-section{margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-border)}
+  body.skin-classic .skin-section{border-top-color:var(--accent-soft)}
+  /* KK's ask (2026-10-10): "give me an option to mute it when it's running task,
+     maybe I'm in a meeting" -- a real toggle, same row language as every picker,
+     living in the voice picker since it's a voice-output concern. Only gates
+     AUTOMATIC announcements (server's /speak-announcement) -- a deliberate click
+     on the speaker button or a task row still plays, muted or not. */
+  #mute-row,#voicelink-row{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--glass-border)}
+  body.skin-classic #mute-row,body.skin-classic #voicelink-row{border-bottom-color:var(--accent-soft)}
+  #mute-row.muted .check,#voicelink-row.muted .check{opacity:1}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="pet-card" class="pet-card" data-motion="idle">
+      <img id="pet" src="/assets/states/idle.png" alt="K2">
+      <div id="pet-sprite"></div>
+    </div>
+    <div id="compose"><textarea id="compose-text" placeholder="Type, then press Enter…" rows="2"></textarea></div>
+    <div id="alert-bubble"><b>NEEDS YOUR INPUT</b><span id="alert-text"></span></div>
+    <div id="status-card"><b id="status-title"></b><span id="status-caption"></span></div>
+    <div id="char-picker"><b>CHOOSE CHARACTER</b><div id="char-list"></div>
+      <div class="skin-section"><b>MENU SKIN</b><div id="skin-list"></div></div>
+    </div>
+    <div id="voice-picker"><b>CHOOSE VOICE</b>
+      <div class="char-row" id="mute-row"><span>Mute automatic announcements</span><span class="check" id="mute-check">✓</span></div>
+      <div class="char-row" id="voicelink-row"><span>Use K² Voice Link (browser, beta)</span><span class="check" id="voicelink-check">✓</span></div>
+      <div id="voice-list"></div>
+    </div>
+    <div id="task-picker"><b>RUNNING TASKS</b><div id="task-list"></div></div>
+    <div id="chrome">
+      <div id="dash"></div>
+      <div id="bar">
+        <button id="btn-character" title="Choose character">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <div class="divider"></div>
+        <!-- Moved here per KK: eye-slash and pencil together up front, shrink/grow
+             (- and +) now sit adjacent at the right, a cleaner grouping by function. -->
+        <button id="btn-hide" title="Hide">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 18M10.6 5.2A10.8 10.8 0 0 1 12 5c5 0 9 3.5 10.5 7-.6 1.4-1.5 2.7-2.6 3.8M6.7 6.7C4.5 8.1 2.8 10.2 1.5 12c1.5 3.5 5.5 7 10.5 7 1.6 0 3.1-.3 4.5-.9M9.9 10a3 3 0 0 0 4.2 4.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="divider"></div>
+        <button id="btn-text" title="Write">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 3l4 4L9 19l-4 1 1-4L17 3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="divider"></div>
+        <!-- KK's ask (2026-10-08): a speaker icon that glows (see #btn-speak.has-result
+             below) the moment a finished task's real summary is ready, click to hear it
+             -- same /speak-last the pet-body click already used, now its own real button
+             instead of only working as a side effect of dismissing the finish dance. -->
+        <button id="btn-speak" title="Hear last result">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M16.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".6"/></svg>
+        </button>
+        <div class="divider"></div>
+        <!-- KK's ask (2026-10-09): pick which Kokoro voice reads out loud -- real
+             catalog from kokoro_server.py's own ALLOWED_VOICES via GET /voices, same
+             picker pattern as #char-picker (CHOOSE CHARACTER), not a new design. -->
+        <button id="btn-voice-select" title="Choose voice">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M12 11.2v4.3M9 18.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6.5 9.5A5.5 5.5 0 0 0 12 15a5.5 5.5 0 0 0 5.5-5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".55"/></svg>
+        </button>
+        <div class="divider"></div>
+        <!-- KK's ask (2026-10-09): which task finished, which is still running, and
+             switch which one to hear -- the real "collision" fix. Same /tasks the
+             server now tracks per real session cwd (tagged by the emit script). -->
+        <button id="btn-tasks" title="Running tasks">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 9.5h9M7.5 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <div class="divider" id="voice-divider"></div>
+        <button id="btn-voice" title="Voice chat">
+          <svg width="20" height="18" viewBox="0 0 24 20"><rect x="1" y="7" width="2.4" height="6" rx="1.2" fill="currentColor"/><rect x="6" y="3" width="2.4" height="14" rx="1.2" fill="currentColor"/><rect x="11" y="0" width="2.4" height="20" rx="1.2" fill="currentColor"/><rect x="16" y="4" width="2.4" height="12" rx="1.2" fill="currentColor"/><rect x="21" y="7" width="2.4" height="6" rx="1.2" fill="currentColor"/></svg>
+        </button>
+        <div class="divider"></div>
+        <button id="btn-shrink" title="Smaller">–</button>
+        <div class="divider"></div>
+        <button id="btn-grow" title="Bigger">+</button>
+      </div>
+    </div>
+  </div>
+  <!-- KK's ask (2026-10-10): a more artistic hide icon fusing the K2 mark into
+       the lantern itself, not just the flat brand mark dropped in. Three real
+       Codex rounds to get here (kept honest at every step, not just trusting
+       its own "looks good" claims): round 1 hand-drew numeral polygons, which
+       read as a bare "2" or went muddy; round 3 switched to rendering the
+       actual letters with a real bold font (Arial Black) instead of freehand
+       shapes -- the fix that actually made "K2" read unambiguously. KK's own
+       call, with the real tradeoff stated plainly: at the true ~22px button
+       size this still reads softer than the old flat mark did, in exchange
+       for being genuinely "K2" fused with the lantern, not just a lantern. -->
+  <button id="peek" title="Show K2 again">
+    <img id="peek-glass-icon" src="/assets/brand/hide-icon-glass.png" alt="" width="26" height="26">
+    <span id="peek-classic-icon">K2</span>
+  </button>
+  <script src="/companion.js"></script>
+</body></html>

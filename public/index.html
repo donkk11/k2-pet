@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>K2 Extended Pet States</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/voice.css"><link rel="stylesheet" href="/states.css"></head>
+<body>
+  <main class="stage">
+    <header><span class="k2">K2</span><span>EXTENDED PET STATES</span><i id="live"></i></header>
+    <div class="workspace">
+      <section class="pet-card" id="card" data-motion="idle">
+        <div class="orb"></div>
+        <img id="pet" src="/assets/states/idle.png" alt="K2 pet">
+        <div id="pet-sprite" role="img" aria-label="K2 animated pet"></div>
+        <div class="signal" role="status" aria-live="polite" aria-atomic="true"><span id="dot" aria-hidden="true"></span><strong id="state">IDLE</strong></div>
+        <p id="meaning" aria-live="polite">Ready for what’s next</p>
+      </section>
+      <section class="state-showcase" aria-labelledby="moves-title">
+        <div class="showcase-heading"><div><small>MOTION PROTOTYPE</small><h1 id="moves-title">Animation moves</h1></div><button id="play-all" type="button">PLAY ALL</button></div>
+        <div id="state-grid" class="state-grid"></div>
+        <div class="move-notes"><strong id="move-name">IDLE</strong><span id="move-description">Slow breathing with a relaxed body float.</span></div>
+        <button id="live-events" type="button">RETURN TO LIVE EVENTS</button>
+      </section>
+    </div>
+    <footer>
+      <button id="voice-sensor" type="button" aria-pressed="false"><span></span>ENABLE VOICE SENSING</button>
+      <div class="evidence"><span id="source">SYSTEM</span><code id="evidence">startup</code></div>
+    </footer>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body></html>

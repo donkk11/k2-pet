@@ -1,0 +1,11 @@
+{
+  "name": "k2-extended-pet-states",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "record": "node src/app-server-recorder.mjs",
+    "serve": "node src/server.mjs"
+  }
+}

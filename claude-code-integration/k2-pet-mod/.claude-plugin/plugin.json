@@ -1,0 +1,7 @@
+{
+  "name": "k2-pet-mod",
+  "version": "0.1.0",
+  "description": "KK's real K2 pet, drawn inside Claude Code itself -- same server, same sprites, same /speak-last, as the external floating window",
+  "author": { "name": "KK Nkama" },
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,194 @@
+{
+  "cell": [
+    192,
+    208
+  ],
+  "states": {
+    "idle": {
+      "file": "states/idle.png",
+      "size": [
+        85,
+        198
+      ]
+    },
+    "waiting": {
+      "file": "states/waiting.png",
+      "size": [
+        104,
+        198
+      ]
+    },
+    "problem": {
+      "file": "states/problem.png",
+      "size": [
+        89,
+        198
+      ]
+    }
+  },
+  "animations": {
+    "running-right": {
+      "file": "animations/running-right.png",
+      "frames": 8,
+      "frameWidth": 124,
+      "frameHeight": 198,
+      "aspectRatio": "124/198"
+    },
+    "running-left": {
+      "file": "animations/running-left.png",
+      "frames": 8,
+      "frameWidth": 131,
+      "frameHeight": 198,
+      "aspectRatio": "131/198"
+    },
+    "waving": {
+      "file": "animations/waving.png",
+      "frames": 4,
+      "frameWidth": 94,
+      "frameHeight": 198,
+      "aspectRatio": "94/198"
+    },
+    "jumping": {
+      "file": "animations/jumping.png",
+      "frames": 5,
+      "frameWidth": 146,
+      "frameHeight": 198,
+      "aspectRatio": "146/198"
+    },
+    "working": {
+      "file": "animations/working.png",
+      "frames": 6,
+      "frameWidth": 155,
+      "frameHeight": 198,
+      "aspectRatio": "155/198"
+    },
+    "checking": {
+      "file": "animations/checking.png",
+      "frames": 6,
+      "frameWidth": 154,
+      "frameHeight": 198,
+      "aspectRatio": "154/198"
+    },
+    "permission-wait": {
+      "file": "animations/permission-wait.png",
+      "frames": 6,
+      "frameWidth": 122,
+      "frameHeight": 198,
+      "aspectRatio": "122/198"
+    }
+  },
+  "gaze": {
+    "000": {
+      "file": "look-000.png",
+      "size": [
+        81,
+        198
+      ]
+    },
+    "022.5": {
+      "file": "look-022.5.png",
+      "size": [
+        79,
+        198
+      ]
+    },
+    "045": {
+      "file": "look-045.png",
+      "size": [
+        79,
+        198
+      ]
+    },
+    "067.5": {
+      "file": "look-067.5.png",
+      "size": [
+        80,
+        198
+      ]
+    },
+    "090": {
+      "file": "look-090.png",
+      "size": [
+        80,
+        198
+      ]
+    },
+    "112.5": {
+      "file": "look-112.5.png",
+      "size": [
+        80,
+        196
+      ]
+    },
+    "135": {
+      "file": "look-135.png",
+      "size": [
+        80,
+        195
+      ]
+    },
+    "157.5": {
+      "file": "look-157.5.png",
+      "size": [
+        80,
+        195
+      ]
+    },
+    "180": {
+      "file": "look-180.png",
+      "size": [
+        77,
+        190
+      ]
+    },
+    "202.5": {
+      "file": "look-202.5.png",
+      "size": [
+        79,
+        190
+      ]
+    },
+    "225": {
+      "file": "look-225.png",
+      "size": [
+        79,
+        189
+      ]
+    },
+    "247.5": {
+      "file": "look-247.5.png",
+      "size": [
+        78,
+        190
+      ]
+    },
+    "270": {
+      "file": "look-270.png",
+      "size": [
+        79,
+        190
+      ]
+    },
+    "292.5": {
+      "file": "look-292.5.png",
+      "size": [
+        79,
+        190
+      ]
+    },
+    "315": {
+      "file": "look-315.png",
+      "size": [
+        79,
+        190
+      ]
+    },
+    "337.5": {
+      "file": "look-337.5.png",
+      "size": [
+        80,
+        190
+      ]
+    }
+  }
+}

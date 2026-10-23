@@ -1,0 +1,67 @@
+{
+  "cell": [
+    192,
+    208
+  ],
+  "states": {
+    "idle": {
+      "file": "states/idle.png",
+      "size": [
+        76,
+        125
+      ]
+    },
+    "waiting": {
+      "file": "states/waiting.png",
+      "size": [
+        73,
+        93
+      ]
+    }
+  },
+  "animations": {
+    "running-right": {
+      "file": "animations/running-right.png",
+      "frames": 8,
+      "frameWidth": 79,
+      "frameHeight": 123,
+      "aspectRatio": "79/123"
+    },
+    "running-left": {
+      "file": "animations/running-left.png",
+      "frames": 8,
+      "frameWidth": 79,
+      "frameHeight": 123,
+      "aspectRatio": "79/123"
+    },
+    "waving": {
+      "file": "animations/waving.png",
+      "frames": 4,
+      "frameWidth": 88,
+      "frameHeight": 128,
+      "aspectRatio": "88/128"
+    },
+    "jumping": {
+      "file": "animations/jumping.png",
+      "frames": 5,
+      "frameWidth": 95,
+      "frameHeight": 128,
+      "aspectRatio": "95/128"
+    },
+    "permission-wait": {
+      "file": "animations/permission-wait.png",
+      "frames": 6,
+      "frameWidth": 75,
+      "frameHeight": 93,
+      "aspectRatio": "75/93"
+    },
+    "working": {
+      "file": "animations/working.png",
+      "frames": 6,
+      "frameWidth": 82,
+      "frameHeight": 121,
+      "aspectRatio": "82/121"
+    }
+  },
+  "gaze": {}
+}

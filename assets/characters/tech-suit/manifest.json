@@ -1,0 +1,25 @@
+{
+  "cell": [
+    192,
+    208
+  ],
+  "states": {
+    "idle": {
+      "file": "states/idle.png",
+      "size": [
+        36,
+        81
+      ]
+    }
+  },
+  "animations": {
+    "idle": {
+      "file": "animations/idle.png",
+      "frames": 10,
+      "frameWidth": 41,
+      "frameHeight": 82,
+      "aspectRatio": "41/82"
+    }
+  },
+  "gaze": {}
+}

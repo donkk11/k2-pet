@@ -1,0 +1,52 @@
+{
+  "characters": [
+    {
+      "id": "gentleman-kk",
+      "label": "Gentleman KK",
+      "thumbnail": "/assets/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "k2-nkama",
+      "label": "K2 Nkama",
+      "thumbnail": "/assets/characters/k2-nkama/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "einstein",
+      "label": "Einstein",
+      "thumbnail": "/assets/characters/einstein/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "bruce-lee",
+      "label": "Bruce Lee",
+      "thumbnail": "/assets/characters/bruce-lee/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "bball",
+      "label": "BBALL",
+      "thumbnail": "/assets/characters/bball/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "basketball-player",
+      "label": "Basketball Player",
+      "thumbnail": "/assets/characters/basketball-player/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "fighter",
+      "label": "Fighter",
+      "thumbnail": "/assets/characters/fighter/states/idle.png",
+      "ready": true
+    },
+    {
+      "id": "tech-suit",
+      "label": "Tech Suit",
+      "thumbnail": "/assets/characters/tech-suit/states/idle.png",
+      "ready": true
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "cell": [
+    192,
+    208
+  ],
+  "states": {
+    "idle": {
+      "file": "states/idle.png",
+      "size": [
+        68,
+        114
+      ]
+    },
+    "problem": {
+      "file": "states/problem.png",
+      "size": [
+        80,
+        107
+      ]
+    },
+    "waiting": {
+      "file": "states/waiting.png",
+      "size": [
+        72,
+        119
+      ]
+    }
+  },
+  "animations": {
+    "running-right": {
+      "file": "animations/running-right.png",
+      "frames": 8,
+      "frameWidth": 104,
+      "frameHeight": 114,
+      "aspectRatio": "104/114"
+    },
+    "running-left": {
+      "file": "animations/running-left.png",
+      "frames": 8,
+      "frameWidth": 103,
+      "frameHeight": 115,
+      "aspectRatio": "103/115"
+    },
+    "waving": {
+      "file": "animations/waving.png",
+      "frames": 4,
+      "frameWidth": 80,
+      "frameHeight": 116,
+      "aspectRatio": "80/116"
+    },
+    "jumping": {
+      "file": "animations/jumping.png",
+      "frames": 5,
+      "frameWidth": 99,
+      "frameHeight": 126,
+      "aspectRatio": "99/126"
+    },
+    "permission-wait": {
+      "file": "animations/permission-wait.png",
+      "frames": 6,
+      "frameWidth": 76,
+      "frameHeight": 120,
+      "aspectRatio": "76/120"
+    },
+    "working": {
+      "file": "animations/working.png",
+      "frames": 6,
+      "frameWidth": 99,
+      "frameHeight": 112,
+      "aspectRatio": "99/112"
+    },
+    "checking": {
+      "file": "animations/checking.png",
+      "frames": 6,
+      "frameWidth": 88,
+      "frameHeight": 117,
+      "aspectRatio": "88/117"
+    }
+  },
+  "gaze": {}
+}
