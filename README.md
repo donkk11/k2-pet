@@ -7,9 +7,9 @@ native window, no cloud dependency, no data leaves your machine.
 
 ![Gentleman KK — idle, working, checking, waiting for permission, problem, finished](media/gentleman-states.png)
 
-<video src="https://github.com/donkk11/k2-pet/releases/download/v1.0.0/k2-nkama-pet-story_2026-09-19_23-03-46.mp4" controls muted playsinline width="760"></video>
+![K2 Pet running](media/k2-pet-demo.gif)
 
-*If the player above does not load, [watch the video here](https://github.com/donkk11/k2-pet/releases/download/v1.0.0/k2-nkama-pet-story_2026-09-19_23-03-46.mp4) (44s).*
+*[Full-quality video (44s, MP4)](https://github.com/donkk11/k2-pet/releases/download/v1.0.0/k2-nkama-pet-story_2026-09-19_23-03-46.mp4)*
 
 ## Install
 
